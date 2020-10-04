@@ -150,12 +150,12 @@ void init(long numberThreads, int qsize) {
 void addTask(void * (fn)(void), int tasknum) {
 
 	// lock queue mutex before making changes to the  queue
-	pthread_mutex_lock(&queue->qLock);
 	if (queue->qcount > queue->qLength){
 		numThreadsIdle++;
 		pthread_cond_wait(&queue->qCon,&queue->qLock);
 		numThreadsIdle--;
 	}
+	pthread_mutex_lock(&queue->qLock);
 	if(queue->head+1 <= queue->qLength){
 		// update the head of the queue
 		queue->head++;
