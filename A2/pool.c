@@ -48,10 +48,12 @@ int threadLocked = 0;
 
 	// lock queue structure before removing a task
 	// only do this if the thread is not already locked (threadLocked == 0)
-
+	if (threadLocked == 0){
+		pthread_mutex_lock(&queue->qLock);
+	}
 
 	// set the thread locked variable to 1 (locked - it's after the mutex)
-
+	threadLocked = 1;
 
 	//      -- remove task from queue if there is one --
 	// if there is a task in the queue (the queue is not empty) then
@@ -64,8 +66,14 @@ int threadLocked = 0;
 	//   set the thread locked variable to 0 (unlocked)
       if (queue->qcount != 0) {
          printf("emptyTask: thread %ld will execute task1 %d\n", rank, queue->tail+1);
-
-      }
+		fn = queue->fn[queue->tail+1];
+		queue->fn[queue->tail+1] = NULL;
+		queue->tail++;
+		queue->qcount--;
+		pthread_mutex_unlock(&queue->qLock);
+		pthread_cond_signal(&queue->qCon);
+		threadLocked = 0;
+	  }
 
 
 	//          -- execute the task -- 
@@ -79,9 +87,12 @@ int threadLocked = 0;
 	//    decrement the idle threads count (this runs when the waiting thread awakens
 	//            and reclaims the lock it released earlier)
       if (fn != NULL) {
-
+		  fn();
+		  fn = NULL;
       } else {
-
+		  numThreadsIdle++;
+		  pthread_cond_wait(&queue->qCon,&queue->qLock);
+		  numThreadsIdle--;
       }
 
    } // while
@@ -99,23 +110,36 @@ void init(long numberThreads, int qsize) {
 
 	// allocate queue structure and initialize head, tail, length of queue,
 	//    and number of items currently in queue  variables
-
+	queue = malloc(sizeof(struct queue_t));
+	queue->head = 0;
+	queue->tail = 0;
+	queue->qLength = qsize;
+	queue->qcount = 0;
 
 	// initialize lock and condition for the queue structure
-
+	pthread_mutex_init(&queue->qLock, NULL);
+	pthread_cond_init(&queue->qCon, NULL);
 
 	// initialize array to store function pointers and set all pointers to NULL
-
+	queue->fn = malloc(sizeof(void**)*queue->qLength);
+	long i = 0;
+	for (i=0; i<queue->qLength; i++){
+		queue->fn[i] = NULL;
+	}
 
 	// initialize thread pool struct
-
+	poolStruct = malloc(sizeof(struct threadpool_t));
 
 	// set the number of threads variable in the pool struct
-
+	poolStruct->count = numberThreads;
 
 	// create array of threads (in the struct) and have each thread
 	// execute emptyTask()
-
+	poolStruct->pool = malloc(sizeof(pthread_t)*poolStruct->count);
+	for (i=0; i<poolStruct->count; i++){
+		pthread_create(poolStruct->pool,NULL,emptyTask,(void*)i);
+	}
+	
 }
 
 
@@ -126,20 +150,28 @@ void init(long numberThreads, int qsize) {
 void addTask(void * (fn)(void), int tasknum) {
 
 	// lock queue mutex before making changes to the  queue
-
-
-	// update the head of the queue
-
-
-	// increment the number of items in the queue 
-
+	pthread_mutex_lock(&queue->qLock);
+	if (queue->qcount > queue->qLength){
+		numThreadsIdle++;
+		pthread_cond_wait(&queue->qCon,&queue->qLock);
+		numThreadsIdle--;
+	}
+	if(queue->head+1 <= queue->qLength){
+		// update the head of the queue
+		queue->head++;
+	}else{
+		queue->head = 0;
+	}
+	// increment the number of items in the queue
+	queue->qcount++;
 
 	// copy passed function pointer to the queue
-
+	queue->fn[queue->head] = fn;
 
 	// unlock queue mutex after new task added to queue
 	// and then signal queue condition to wake up a thread (in case all threads waiting)
-
+	pthread_mutex_unlock(&queue->qLock);
+	pthread_cond_signal(&queue->qCon);
 }
 
 
