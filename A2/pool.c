@@ -65,10 +65,14 @@ int threadLocked = 0;
 	//   send a conditional signal to the mutex on the queue to wake up another thread
 	//   set the thread locked variable to 0 (unlocked)
       if (queue->qcount != 0) {
-         printf("emptyTask: thread %ld will execute task1 %d\n", rank, queue->tail+1);
+		printf("emptyTask: thread %ld will execute task1 %d\n", rank, queue->tail+1);
 		fn = queue->fn[queue->tail+1];
 		queue->fn[queue->tail+1] = NULL;
-		queue->tail++;
+		if (queue->tail+1 == queue->qLength){
+			queue->tail = 0;
+		}else{
+			queue->tail++;
+		}
 		queue->qcount--;
 		pthread_mutex_unlock(&queue->qLock);
 		pthread_cond_signal(&queue->qCon);
@@ -89,7 +93,7 @@ int threadLocked = 0;
       if (fn != NULL) {
 		  fn();
 		  fn = NULL;
-      } else {
+      } else if (threadLocked ==1) {
 		  numThreadsIdle++;
 		  pthread_cond_wait(&queue->qCon,&queue->qLock);
 		  numThreadsIdle--;
@@ -148,14 +152,13 @@ void init(long numberThreads, int qsize) {
 	// the function pointer is passed as a parameter
 	// the task number is also a parameter
 void addTask(void * (fn)(void), int tasknum) {
-
+	pthread_mutex_lock(&queue->qLock);
 	// lock queue mutex before making changes to the  queue
 	if (queue->qcount > queue->qLength){
 		numThreadsIdle++;
 		pthread_cond_wait(&queue->qCon,&queue->qLock);
 		numThreadsIdle--;
 	}
-	pthread_mutex_lock(&queue->qLock);
 	if(queue->head+1 <= queue->qLength){
 		// update the head of the queue
 		queue->head++;
