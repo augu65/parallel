@@ -19,8 +19,15 @@ struct stack_maze
 //global grid variable
 char ** grid;
 
+//global counters
+int ctrZero = 0;
+int ctrOne = 0;
+int ctrTwo = 0;
+int ctrThree = 0;
+
 // adds an element to the stack
-void push(int x, int y, int d, struct stack_maze * stack){
+void push(int x, int y, int d, struct stack_maze *stack)
+{
     stack->top ++;
     stack->array[stack->top][0] = x;
     stack->array[stack->top][1] = y;
@@ -38,44 +45,200 @@ void pop(struct stack_maze * stack){
         stack->count --;
     }
 }
-void pMaze(int num) {
-    struct stack_maze *stack = malloc(sizeof(struct stack_maze) * 1);
-    stack->count = 0;
-    stack->top = 0;
-    
-}
-
 void maze(int size) {
-    struct stack_maze * stack = malloc(sizeof(struct stack_maze)*1);
+    struct stack_maze *stack = malloc(sizeof(struct stack_maze) * 1);
     stack->count = 0;
     stack->top = 0;
     int top[3];
     grid[1][1] = '0';
     //randomize the start
-    int num = rand()%2;
-    if(num == 1){
+    int num = rand() % 2;
+    if (num == 1)
+    {
         push(3, 1, 1, stack);
         push(1, 3, 2, stack);
-    }else{
+    }
+    else
+    {
         push(1, 3, 2, stack);
         push(3, 1, 1, stack);
+    }
+    while (stack->count != 0)
+    {
+        top[0] = stack->array[stack->top][0];
+        top[1] = stack->array[stack->top][1];
+        top[2] = stack->array[stack->top][2];
+        pop(stack);
+        if (grid[top[0]][top[1]] == '.')
+        {
+            grid[top[0]][top[1]] = '0';
+            //prints the number between two filled in dots
+            if (top[2] == 1)
+            {
+                grid[top[0] - 1][top[1]] = '0';
+            }
+            else if (top[2] == 3)
+            {
+                grid[top[0] + 1][top[1]] = '0';
+            }
+            else if (top[2] == 2)
+            {
+                grid[top[0]][top[1] - 1] = '0';
+            }
+            else if (top[2] == 4)
+            {
+                grid[top[0]][top[1] + 1] = '0';
+            }
+            int arr[4];
+            int ctr = 0;
+            while (ctr < 4)
+            {
+                int flag = 0;
+                //gets random numbers
+                do
+                {
+                    flag = 0;
+                    num = rand() % 4;
+                    for (int i = 0; i < ctr; i++)
+                    {
+                        if (arr[i] == num)
+                        {
+                            flag = 1;
+                            break;
+                        }
+                    }
+                } while (flag == 1);
+                arr[ctr] = num;
+                ctr++;
+                //pushes on all 4 sizes if possible
+                if (top[0] - 2 > 0 && num == 0)
+                {
+                    if (grid[top[0] - 2][top[1]] == '.')
+                    {
+                        push(top[0] - 2, top[1], 3, stack);
+                    }
+                }
+                if (top[0] + 2 < size && num == 1)
+                {
+                    if (grid[top[0] + 2][top[1]] == '.')
+                    {
+                        push(top[0] + 2, top[1], 1, stack);
+                    }
+                }
+                if (top[1] + 2 < size && num == 2)
+                {
+                    if (grid[top[0]][top[1] + 2] == '.')
+                    {
+                        push(top[0], top[1] + 2, 2, stack);
+                    }
+                }
+                if (top[1] - 2 > 0 && num == 3)
+                {
+                    if (grid[top[0]][top[1] - 2] == '.')
+                    {
+                        push(top[0], top[1] - 2, 4, stack);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void pMaze(int size) {
+    struct stack_maze * stack = malloc(sizeof(struct stack_maze)*1);
+    stack->count = 0;
+    stack->top = 0;
+    int rank = omp_get_thread_num();
+    int top[3];
+    int num;
+    if(rank == 0){
+        if(grid[1][1] == '.'){
+            grid[1][1] = rank + '0';
+            //randomize the start
+            num = rand() % 2;
+            if (num == 1)
+            {
+                push(3, 1, 1, stack);
+                push(1, 3, 2, stack);
+            }
+            else
+            {
+                push(1, 3, 2, stack);
+                push(3, 1, 1, stack);
+            }
+        }
+    }else if(rank == 1){
+        if(grid[1][size-2] == '.'){
+            grid[1][size-2] = rank + '0';
+            //randomize the start
+            num = rand()%2;
+            if(num == 1){
+                push(3, size - 2, 1, stack);
+                push(1, size - 4, 4, stack);
+            }else{
+                push(1, size - 4, 4, stack);
+                push(3, size - 2, 1, stack);
+            }
+        }
+    }else if(rank == 2){
+        if(grid[size-2][1] == '.'){
+            grid[size-2][1] =  rank + '0';
+            //randomize the start
+            num = rand()%2;
+            if(num == 1){
+                push(size - 4, 1, 3, stack);
+                push(size - 2, 3, 2, stack);
+            }else{
+                push(size - 2, 3, 2, stack);
+                push(size - 4, 1, 3, stack);
+            }
+        }
+    }else if(rank == 3){
+        if (grid[size - 2][size - 2] == '.')
+        {
+            grid[size - 2][size - 2] = rank + '0';
+            //randomize the start
+            num = rand() % 2;
+            if (num == 1)
+            {
+                push(size - 4, size - 2, 3, stack);
+                push(size - 2, size - 4, 4, stack);
+            }
+            else
+            {
+                push(size - 2, size - 4, 4, stack);
+                push(size - 4, size - 2, 3, stack);
+            }
+        }
     }
     while(stack->count !=0){
         top[0] = stack->array[stack->top][0];
         top[1] = stack->array[stack->top][1];
         top[2] = stack->array[stack->top][2];
         pop(stack);
-        if (grid[top[0]][top[1]] == '.'){
-            grid[top[0]][top[1]] = '0';
+#pragma omp critical 
+{
+        if (grid[top[0]][top[1]] == '.')
+        {
+            if(rank == 0){
+                ctrZero ++;
+            }else if(rank == 1){
+                ctrOne ++;
+            }else if(rank == 2){
+                ctrTwo ++;
+            }else if(rank == 3){
+                ctrThree ++;
+            }
+            grid[top[0]][top[1]] =  rank + '0';
             //prints the number between two filled in dots
             if (top[2] == 1){
-                grid[top[0] - 1][top[1] ] = '0';
+                grid[top[0] - 1][top[1]] = rank + '0';
             }else if(top[2] == 3){
-                grid[top[0] + 1][top[1]] = '0';
+                grid[top[0] + 1][top[1]] = rank + '0';
             }else if(top[2] == 2){
-                grid[top[0]][top[1] - 1] = '0';
+                grid[top[0]][top[1] - 1] = rank + '0';
             }else if(top[2] == 4){
-                grid[top[0]][top[1] + 1] = '0';
+                grid[top[0]][top[1] + 1] = rank + '0';
             }
             int arr[4];
             int ctr = 0;
@@ -117,6 +280,7 @@ void maze(int size) {
                 }
             }
         }
+}
     }
 }
 
@@ -166,5 +330,9 @@ int main(int argc, char *argv[]) {
         }
         printf("\n");
     }
+    printf("Process 0 count: %d\n",ctrZero);
+    printf("Process 1 count: %d\n",ctrOne);
+    printf("Process 2 count: %d\n",ctrTwo);
+    printf("Process 3 count: %d\n",ctrThree);
     return 0;
 }
