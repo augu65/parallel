@@ -117,6 +117,7 @@ int main( int argc, char ** argv)
   int kernals = 1;
   int size = 20;
   int config = 0;
+  //get user input
   if (argc > 1) {
     int argPtr = 1;
     while(argPtr < argc) {
@@ -133,6 +134,10 @@ int main( int argc, char ** argv)
       }else if (strcmp(argv[argPtr], "-i") == 0) {
         sscanf(argv[argPtr+1], "%d", &config);
         argPtr += 2;
+        if(config > 4){
+          config = 0;
+          printf("pattern does not exist. Implementing random\n");
+        }
       }
     }
   }
@@ -147,9 +152,12 @@ int main( int argc, char ** argv)
   float data[size * size];
   time_t t;
   cl_mem input_buffer, given_buffer;
+  //initialize data array to -1
   for (int i=0; i < size * size; i++){
     data[i] = -1;
   }
+  //setup starting pattern
+  //seed randomness
   if (config == 0){
     srand((unsigned) time(&t));
     for (int i=0; i< size; i++){
@@ -197,6 +205,7 @@ int main( int argc, char ** argv)
 
   /* Create data buffer */
   input_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (size * size) * sizeof(float), data, &err);
+  //pass flag data
   given_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 3 * sizeof(float), given, &err);
   if (err < 0)
   {
@@ -224,8 +233,7 @@ int main( int argc, char ** argv)
 
   /* Create kernel arguments */
   err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_buffer);
-  err |= clSetKernelArg(kernel, 1, local_size * sizeof(float), NULL);
-  err = clSetKernelArg(kernel, 2, sizeof(cl_mem), &given_buffer);
+  err = clSetKernelArg(kernel, 1, sizeof(cl_mem), &given_buffer);
   if (err < 0)
   {
     perror("Couldn't create a kernel argument");
@@ -249,8 +257,9 @@ int main( int argc, char ** argv)
     perror("Couldn't read the buffer");
     exit(1);
   }
-
+  //print out array
   for (int i = 0; i < size * size; i++){
+    //-1 means its a space
     if(data[i] != -1){
       printf("%0.f", data[i]);
     }else{
@@ -264,6 +273,7 @@ int main( int argc, char ** argv)
   /* Deallocate resources */
   clReleaseKernel(kernel);
   clReleaseMemObject(input_buffer);
+  clReleaseMemObject(given_buffer);
   clReleaseCommandQueue(queue);
   clReleaseProgram(program);
   clReleaseContext(context);

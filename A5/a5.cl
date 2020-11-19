@@ -1,40 +1,43 @@
-__kernel void a5(__global float* data, 
-      __local float* local_result, __global float* given) {
+__kernel void a5(__global float* data,  __global float* given) {
 
-   float sum;
-   float4 input1, input2, sum_vector;
-   uint global_addr, local_addr;
+   int local_addr;
+   local_addr = get_local_id(0);
    uint size = given[1];
-   //fix this it should start at size
+   int begin = (size*local_addr)/given[0];
+   int end = (size*(local_addr+1))/given[0];
+   //loops for number of rows
    for(int i=1; i < size; i++){
-      for (int j=0; j < size; j++ ){
-         if(((size*i) + j) % size == 0){
-            if(data[size*(i-1)+j] == 0 && data[size*(i-1)+j] == 0){
-               data[(size*i) + j] = 0;
-            }else if(data[size*(i-1)+j] == 0 && data[size*(i-1)+j] != 0){
-               data[(size*i) + j] = 0;
-            }if(data[size*(i-1)+j] != 0 && data[size*(i-1)+j] == 0){
-               data[(size*i) + j] = 0;
+      //loops for the number of columns
+      for (int j=begin; j < end; j++ ){
+         //if at left wall
+         if(j == 0){
+            if(data[size*(i-1)+j] != -1 && data[size*(i-1)+j+1] != -1){
+               data[(size*i) + j] = local_addr;
+            }else if(data[size*(i-1)+j] != -1 && data[size*(i-1)+j+1] == -1){
+               data[(size*i) + j] = local_addr;
+            }if(data[size*(i-1)+j] == -1 && data[size*(i-1)+j+1] != -1){
+               data[(size*i) + j] = local_addr;
             }
-         }else if(((size*i) + j+1)%size == 0){
-            if(data[size*(i-1)+j] == 0 && data[size*(i-1)+j-1] != 0){
-               data[(size*i) + j] = 0;
-            }else if(data[size*(i-1)+j-1] == 0 && data[size*(i-1)+j] != 0){
-               data[(size*i) + j] = 0;
+         // if at right wall
+         }else if(j+1 - size == 0){
+            if(data[size*(i-1)+j] != -1 && data[size*(i-1)+j-1] == -1){
+               data[(size*i) + j] = local_addr;
+            }else if(data[size*(i-1)+j-1] != -1 && data[size*(i-1)+j] == -1){
+               data[(size*i) + j] = local_addr;
             }
+         // if not at wall
          }else{
-            if(data[size*(i-1)+j] == 0 && data[size*(i-1)+j-1] != 0 && data[size*(i-1)+j+1] != 0){
-               data[(size*i) + j] = 0;
-            }else if(data[size*(i-1)+j] == 0 && data[size*(i-1)+j-1] != 0 && data[size*(i-1)+j+1] == 0){
-               data[(size*i) + j] = 0;
-            }else if(data[size*(i-1)+j] != 0 && data[size*(i-1)+j-1] != 0 && data[size*(i-1)+j+1] == 0){
-               data[(size*i) + j] = 0;
-            }else if(data[size*(i-1)+j] != 0 && data[size*(i-1)+j-1] == 0 && data[size*(i-1)+j+1] != 0){
-               data[(size*i) + j] = 0;
+            if(data[size*(i-1)+j] != -1 && data[size*(i-1)+j-1] == -1 && data[size*(i-1)+j+1] == -1){
+               data[(size*i) + j] = local_addr;
+            }else if(data[size*(i-1)+j] != -1 && data[size*(i-1)+j-1] == -1 && data[size*(i-1)+j+1] != -1){
+               data[(size*i) + j] = local_addr;
+            }else if(data[size*(i-1)+j] == -1 && data[size*(i-1)+j-1] == -1 && data[size*(i-1)+j+1] != -1){
+               data[(size*i) + j] = local_addr;
+            }else if(data[size*(i-1)+j] == -1 && data[size*(i-1)+j-1] != -1 && data[size*(i-1)+j+1] == -1){
+               data[(size*i) + j] = local_addr;
             }
          }
       }
+      barrier(CLK_LOCAL_MEM_FENCE);
    }
-
-   barrier(CLK_LOCAL_MEM_FENCE);
 }
