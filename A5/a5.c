@@ -1,6 +1,5 @@
 #define PROGRAM_FILE "a5.cl"
 #define KERNEL_FUNC "a5"
-#define ARRAY_SIZE 64
 
 #include <math.h>
 #include <stdio.h>
@@ -103,7 +102,7 @@ cl_program build_program(cl_context ctx, cl_device_id dev, const char *filename)
   return program;
 }
 
-int main()
+int main( int argc, char ** argv)
 {
 
   /* OpenCL structures */
@@ -112,19 +111,76 @@ int main()
   cl_program program;
   cl_kernel kernel;
   cl_command_queue queue;
-  cl_int i, j, err;
+  cl_int err;
   size_t local_size, global_size;
 
-  /* Data and buffers */
-  float data[ARRAY_SIZE];
-  float sum[2], total, actual_sum;
-  cl_mem input_buffer, sum_buffer;
-  cl_int num_groups;
+  int kernals = 1;
+  int size = 20;
+  int config = 0;
+  if (argc > 1) {
+    int argPtr = 1;
+    while(argPtr < argc) {
+      if (strcmp(argv[argPtr], "-n") == 0) {
+        sscanf(argv[argPtr+1], "%d", &kernals);
+        argPtr += 2;
+      } else if (strcmp(argv[argPtr], "-s") == 0) {
+        sscanf(argv[argPtr+1], "%d", &size);
+        argPtr += 2;
+        if(size < 7){
+          printf("please enter a size 7 or larger.\ngoodbye.\n");
+          return 0;
+        }
+      }else if (strcmp(argv[argPtr], "-i") == 0) {
+        sscanf(argv[argPtr+1], "%d", &config);
+        argPtr += 2;
+      }
+    }
+  }
+    global_size = kernals;
+    local_size = kernals;
 
-  /* Initialize data */
-  for (i = 0; i < ARRAY_SIZE; i++)
-  {
-    data[i] = 1.0f * i;
+  /* Data and buffers */
+  float given[3];
+  given[0] = kernals;
+  given[1] = size;
+  given[2] = config;
+  float data[size * size];
+  time_t t;
+  cl_mem input_buffer, given_buffer;
+  for (int i=0; i < size * size; i++){
+    data[i] = -1;
+  }
+  if (config == 0){
+    srand((unsigned) time(&t));
+    for (int i=0; i< size; i++){
+      if (rand()%2 == 1){
+        data[i] = 0;
+      }
+    }
+  }else if (config == 1) {
+    data[(size/2)-2] = 0;
+    data[(size/2)] = 0;
+    data[(size/2)+1] = 0;
+  } else if (config == 2) {
+    data[(size/2)-3] = 0;
+    data[(size/2)-2] = 0;
+    data[(size/2)-1] = 0;
+    data[(size/2)] = 0;
+    data[(size/2)+1] = 0;
+    data[(size/2)+2] = 0;
+  } else if (config == 3) {
+    data[(size/2)-2] = 0;
+    data[(size/2)] = 0;
+    data[(size/2)+1] = 0;
+    data[(size/2)+2] = 0;
+  } else if (config == 4) {
+    data[(size/2)-3] = 0;
+    data[(size/2)-2] = 0;
+    data[(size/2)-1] = 0;
+    data[(size/2)] = 0;
+    data[(size/2)+1] = 0;
+    data[(size/2)+2] = 0;
+    data[(size/2)+3] = 0;
   }
 
   /* Create device and context */
@@ -140,11 +196,8 @@ int main()
   program = build_program(context, device, PROGRAM_FILE);
 
   /* Create data buffer */
-  global_size = 8;
-  local_size = 4;
-  num_groups = global_size / local_size;
-  input_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, ARRAY_SIZE * sizeof(float), data, &err);
-  sum_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, num_groups * sizeof(float), sum, &err);
+  input_buffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (size * size) * sizeof(float), data, &err);
+  given_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 3 * sizeof(float), given, &err);
   if (err < 0)
   {
     perror("Couldn't create a buffer");
@@ -172,7 +225,7 @@ int main()
   /* Create kernel arguments */
   err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_buffer);
   err |= clSetKernelArg(kernel, 1, local_size * sizeof(float), NULL);
-  err |= clSetKernelArg(kernel, 2, sizeof(cl_mem), &sum_buffer);
+  err = clSetKernelArg(kernel, 2, sizeof(cl_mem), &given_buffer);
   if (err < 0)
   {
     perror("Couldn't create a kernel argument");
@@ -189,30 +242,27 @@ int main()
   }
 
   /* Read the kernel's output */
-  err = clEnqueueReadBuffer(queue, sum_buffer, CL_TRUE, 0,
-                            sizeof(sum), sum, 0, NULL, NULL);
+  err = clEnqueueReadBuffer(queue, input_buffer, CL_TRUE, 0,
+                            sizeof(data), data, 0, NULL, NULL);
   if (err < 0)
   {
     perror("Couldn't read the buffer");
     exit(1);
   }
 
-  /* Check result */
-  total = 0.0f;
-  for (j = 0; j < num_groups; j++)
-  {
-    total += sum[j];
+  for (int i = 0; i < size * size; i++){
+    if(data[i] != -1){
+      printf("%0.f", data[i]);
+    }else{
+      printf(" ");
+    }
+    if((i +1) % size == 0){
+      printf("\n");
+    }
   }
-  actual_sum = 1.0f * ARRAY_SIZE / 2 * (ARRAY_SIZE - 1);
-  printf("Computed sum = %.1f.\n", total);
-  if (fabs(total - actual_sum) > 0.01 * fabs(actual_sum))
-    printf("Check failed.\n");
-  else
-    printf("Check passed.\n");
 
   /* Deallocate resources */
   clReleaseKernel(kernel);
-  clReleaseMemObject(sum_buffer);
   clReleaseMemObject(input_buffer);
   clReleaseCommandQueue(queue);
   clReleaseProgram(program);
